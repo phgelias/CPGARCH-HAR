@@ -1,6 +1,6 @@
 scp <- function(cal, y, test, sig = 0.05) {
 
-  f.score <- function(y, x) abs(y - x)/x
+  f.score <- function(y, x) abs(y - x)
   
   scores <- f.score(y, cal)
   
@@ -8,7 +8,7 @@ scp <- function(cal, y, test, sig = 0.05) {
   
   q_cal <- quantile(scores, probs = ceiling((1-sig) * (n_cal+1))/n_cal)
   
-  ic <- data.frame(test, down = test - q_cal * test, up = test + q_cal * test)
+  ic <- data.frame(test, down = test - q_cal, up = test + q_cal)
     
   ic$amp <- ic$up - ic$down
   

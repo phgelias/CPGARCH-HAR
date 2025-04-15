@@ -49,6 +49,34 @@ test_gab <- val_gab[-cal_id]
 cal_pred <- val_pred[cal_id]
 test_pred <- val_pred[-cal_id]
 
+scores <- abs(cal_gab - cal_pred)/sqrt(cal_pred)
+
+n_cal <- length(scores)
+
+q_cal <- quantile(scores, probs = ceiling((1-0.05) * (n_cal+1))/n_cal)
+
+test_scp <- data.frame(test = test_pred, gab = test_gab, 
+                       down = test_pred - q_cal * sqrt(test_pred), up = test_pred + q_cal * sqrt(test_pred))
+
+test_scp$amp <- test_scp$up - test_scp$down
+
+ic_test <- test_scp
+ic_test$gab <- test_gab
+
+ic_test <- test_scp %>% 
+  mutate(check = ifelse(gab <= up & gab >= down, T, F))
+
+ic_test %>%
+  ggplot(aes(x = seq(1, nrow(ic_test)))) +
+  geom_line(aes(y = gab)) +
+  geom_line(aes(y = down), color = "red") +
+  geom_line(aes(y = up), color = "blue") +
+  labs(title = "HAR: RVSPY data", x = "Index", y = "Realized volatility") +
+  theme_minimal()
+
+mean(ic_test$check)
+mean(ic_test$amp)
+
 test_scp <- scp(cal = cal_pred, y = cal_gab, test = test_pred)
 
 ic_test <- test_scp$ic_test
@@ -56,6 +84,14 @@ ic_test$gab <- test_gab
 
 ic_test <- ic_test %>% 
   mutate(check = ifelse(gab <= up & gab >= down, T, F))
+
+ic_test %>%
+  ggplot(aes(x = seq(1, nrow(ic_test)))) +
+  geom_line(aes(y = gab)) +
+  geom_line(aes(y = down), color = "red") +
+  geom_line(aes(y = up), color = "blue") +
+  labs(title = "HAR: RVSPY data", x = "Index", y = "Realized volatility") +
+  theme_minimal()
 
 mean(ic_test$check)
 mean(ic_test$amp)
@@ -71,9 +107,9 @@ x <- rnorm(n, 10, 4)
 y <- 10 + 5 * x + e
 
 data <- data.frame(y, x)
-treino <- data[1:7000, ]
-cal <- data[7001:8500, ]
-test <- data[8501:10000, ]
+treino <- data[1:round(n * 0.7), ]
+cal <- data[(round(n * 0.7)+1):(round(n * 0.7) + round(n * 0.3/2)), ]
+test <- data[(round(n * 0.7) + round(n * 0.3/2)+1):n, ]
 
 fit <- lm(y ~ x, treino)
 summary(fit)
@@ -92,6 +128,15 @@ ic_test$gab <- test_gab
 ic_test <- ic_test %>% 
   mutate(check = ifelse(gab <= up & gab >= down, T, F))
 
+ic_test %>% 
+  mutate(x = x[8501:10000]) %>% 
+  ggplot(aes(x = x)) +
+  geom_line(aes(y = gab)) +
+  geom_line(aes(y = down), color = "red") +
+  geom_line(aes(y = up), color = "blue") +
+  labs(title = "Regression: simulated data", x = "x", y = "y") +
+  theme_minimal()
+
 mean(ic_test$check)
 mean(ic_test$amp)
 
@@ -109,6 +154,7 @@ fit <- ugarchfit(data = dmbp[,1], spec = spec, out.sample = 592)
 val_fore <- ugarchforecast(fit, n.ahead = 1, n.roll = 591)
 
 val_pred <- val_fore@forecast$sigmaFor %>% t() %>% as.numeric()
+val_pred <- val_pred^2
 
 gab <- dmbp$V1^2
 
@@ -118,13 +164,37 @@ test_pred <- val_pred[297:592]
 cal_gab <- gab[1383:1678]
 test_gab <- gab[1679:1974]
 
-test_scp <- scp(cal = cal_pred, y = cal_gab, test = test_pred)
+scores <- abs(cal_gab - cal_pred)/sqrt(cal_pred)
 
-ic_test <- test_scp$ic_test
+n_cal <- length(scores)
+
+q_cal <- quantile(scores, probs = ceiling((1-0.05) * (n_cal+1))/n_cal)
+
+test_scp <- data.frame(test = test_pred, gab = test_gab, 
+                       down = test_pred - q_cal * sqrt(test_pred), up = test_pred + q_cal * sqrt(test_pred))
+
+test_scp$amp <- test_scp$up - test_scp$down
+
+ic_test <- test_scp
 ic_test$gab <- test_gab
 
-ic_test <- ic_test %>% 
+ic_test <- test_scp %>% 
   mutate(check = ifelse(gab <= up & gab >= down, T, F))
+
+ic_test %>%
+  ggplot(aes(x = seq(1, nrow(ic_test)))) +
+  geom_line(aes(y = gab)) +
+  geom_line(aes(y = down), color = "red") +
+  geom_line(aes(y = up), color = "blue") +
+  labs(title = "GARCH: dmbp data", x = "Index", y = "Squared returns") +
+  theme_minimal()
 
 mean(ic_test$check)
 mean(ic_test$amp)
+
+# GARCH SIM
+
+library(fGarch)
+
+spec <- garchSpec(model = list())
+sim <- garchSim(spec, n = 10000)
